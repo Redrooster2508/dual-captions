@@ -127,6 +127,36 @@ test('other languages with regional varieties', () => {
   assert.equal(best(['ar-SA', 'ar-LB'], 'ar-SY'), 'ar-LB');
 });
 
+test('Catalan: Valencian has its own variant subtag', () => {
+  assert.equal(DC.normTag('ca-ES-valencia'), 'ca-valencia');
+  assert.equal(DC.normTag('ca-es-VALENCIA'), 'ca-valencia');
+  assert.equal(DC.normTag('ca-ES'), 'ca-ES');
+  assert.equal(DC.normTag('en-GB-oxendict'), 'en-GB'); // variants not listed are ignored
+  assert.equal(best(['ca', 'ca-ES-valencia', 'ca-AD'], 'ca-valencia'), 'ca-ES-valencia');
+  assert.equal(best(['ca', 'ca-ES-valencia'], 'ca-ES'), 'ca-ES-valencia'); // same group beats plain
+  assert.equal(best(['ca-AD', 'ca-FR'], 'ca-valencia'), 'ca-AD');
+  const n = DC.namer(['en']);
+  assert.equal(n.full('ca-ES-valencia'), 'Catalan (Valencia)');
+  assert.equal(n.variety('ca-ES'), 'Catalonia');
+  assert.equal(n.variety('es-ES'), 'Spain'); // the Catalan label stays with Catalan
+  assert.deepEqual(Array.from(n.varieties('ca'), ([t]) => t), ['ca-AD', 'ca-ES', 'ca-valencia']);
+  assert.equal(DC.offeredTag('ca-FR'), 'ca-ES');
+});
+
+test('Persian: Iran and Afghanistan (Dari)', () => {
+  assert.equal(DC.normTag('prs'), 'fa-AF'); // Dari's own code
+  assert.equal(DC.normTag('pes'), 'fa-IR');
+  assert.equal(DC.normTag('fa'), 'fa');
+  assert.equal(best(['fa', 'fa-AF'], 'fa-IR'), 'fa');
+  assert.equal(best(['fa', 'prs'], 'fa-AF'), 'prs');
+  assert.deepEqual(Array.from(DC.namer(['en']).varieties('fa'), ([t, name]) => `${t}=${name}`), ['fa-AF=Afghanistan', 'fa-IR=Iran']);
+});
+
+test('languages added in 0.2.1', () => {
+  const n = DC.namer(['en']);
+  assert.deepEqual(['ca', 'gl', 'eu', 'ga', 'cy'].map((c) => DC.LANGS.includes(c) && n.base(c)).join(), 'Catalan,Galician,Basque,Irish,Welsh');
+});
+
 test('defaults, popup options and names', () => {
   assert.equal(DC.DEFAULTS.nativeLang, 'en-GB');
   assert.equal(DC.offeredTag('zh-CN'), 'zh-Hans');

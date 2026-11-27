@@ -41,7 +41,7 @@ This works in Chrome, Edge, Brave and other Chromium browsers. After editing the
 
 ## Regional varieties
 
-Languages differ from place to place: a *guagua* is a bus in Puerto Rico and a baby in Chile. Under each language in the popup you can pick a region. Spanish has Spain, Mexico, the US, Puerto Rico, Cuba, the Dominican Republic, Colombia, Venezuela, Peru, Chile, Argentina, or Latin America in general. Portuguese, English, French, German, Dutch, Chinese and Arabic have regions too.
+Languages differ from place to place: a *guagua* is a bus in Puerto Rico and a baby in Chile. Under each language in the popup you can pick a region. Spanish has Spain, Mexico, the US, Puerto Rico, Cuba, the Dominican Republic, Colombia, Venezuela, Peru, Chile, Argentina, or Latin America in general. Portuguese, English, French, German, Dutch, Catalan (Catalonia, Valencia, Andorra), Chinese, Arabic and Persian (Iran, Afghanistan) have regions too.
 
 - **Subtitles:** the closest track is chosen. If you're learning Puerto Rican Spanish and a video has Spain and Latin American subtitles, you get the Latin American ones. Human subtitles still come before auto-generated ones.
 - **Translations:** YouTube auto-translate and DeepL use your region where they have it. DeepL has British and American English, European and Brazilian Portuguese, Latin American Spanish, and Simplified and Traditional Chinese. Chrome's on-device translator has no regions; the popup tells you when that applies.
