@@ -4,7 +4,8 @@ tags: [todo]
 # Known issues and next steps
 
 ## Open
-- [ ] **Check on real YouTube:** a video with subtitles in several languages. Both lines should appear within about 10 s; also check auto-translate, auto-generated captions and ads. See [[YouTube]]
+- [x] **Works on real YouTube:** checked by hand, 2026-11-27. See [[YouTube]]
+- [ ] On real YouTube, also try auto-translate, auto-generated captions, ads and choosing a region
 - [ ] **Check on real Netflix:** both lines, the next episode (preloaded manifest), A / R / D seeking, and captions clearing the controls. See [[Netflix]]
 - [ ] **Check Chrome's on-device translator** (Chrome 138+): the first-use click, download progress, a language pair it doesn't support. See [[Machine translation]]
 - [ ] **Check regional varieties on real sites:**

@@ -5,6 +5,12 @@ tags: [log]
 
 Newest first. Commit ids link the change to the repository history. The narrative is in [[Log/2026-11-27]].
 
+## 2026-11-27 · Catalan and more languages, 0.2.1 (`46218b2`)
+- Catalan added to the languages, with Catalonia, Valencia and Andorra as regions. Valencian uses its own tag, `ca-ES-valencia`. See [[Regional varieties]]
+- Galician, Basque, Irish and Welsh added, without regions
+- Persian gets Iran and Afghanistan as regions; Dari's code `prs` counts as Persian (Afghanistan)
+- Region names can differ by language: `ca-ES` is "Catalonia", while `es-ES` stays "Spain"
+
 ## 2026-11-27 · Regional varieties, 0.2.0 (`d7b879f`)
 - Choose a region for "I'm learning" and "I speak": Spain, Mexico, Puerto Rico and nine more for Spanish; Brazil and Portugal; US, UK, Australia…; Canada and France; Simplified and Traditional Chinese; Arabic by country. See [[Regional varieties]]
 - Subtitles, YouTube auto-translate and DeepL (`EN-GB`, `PT-PT`, `ES-419`, `ZH-HANT`…) use the closest variety; the popup says when an engine can't produce yours

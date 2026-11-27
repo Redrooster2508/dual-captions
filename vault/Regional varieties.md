@@ -6,7 +6,7 @@ tags: [languages]
 Requested 2026-11-27: "languages have different words eg spanish in europe vs mexican vs pr spanish is different make sure this and other languages are accounted for" ([[Log/2026-11-27]]). A *guagua* is a bus in Puerto Rico and a baby in Chile, so the region matters for subtitles, translations, pronunciation, dictionaries and saved words.
 
 ## The model
-Every language setting and library entry is a BCP 47 tag. A region (for Chinese, a script) makes it a variety: `es-PR`, `pt-PT`, `zh-Hant`. A bare tag (`es`) means any variety, or not known. Old codes that sites still use are mapped: `iw` → `he` (YouTube's Hebrew), `in` → `id`, `fil` → `tl`, `no` → `nb`, `ji` → `yi`, `jw` → `jv`, `mo` → `ro`.
+Every language setting and library entry is a BCP 47 tag. A region (for Chinese, a script) makes it a variety: `es-PR`, `pt-PT`, `zh-Hant`. Valencian Catalan has its own registered variant subtag (`ca-ES-valencia`, kept as `ca-valencia`). Only variants listed in `DC.VARIETIES` count, so `en-GB-oxendict` is just `en-GB`. A bare tag (`es`) means any variety, or not known. Old codes that sites still use are mapped: `iw` → `he` (YouTube's Hebrew), `in` → `id`, `fil` → `tl`, `no` → `nb`, `ji` → `yi`, `jw` → `jv`, `mo` → `ro`. So are codes that name a variety: `prs` (Dari) → `fa-AF`, `pes` → `fa-IR`.
 
 `DC.VARIETIES` in `src/shared/settings.js` lists, per language, the regions offered in the popup, groups of regions that use the language in similar ways, and the nearest neighbours of some regions.
 
@@ -20,8 +20,10 @@ Every language setting and library entry is a BCP 47 tag. A region (for Chinese,
 | Dutch | Netherlands, Belgium | Netherlands and Suriname · Belgium |
 | Chinese | Simplified, Traditional, Hong Kong | Simplified (CN, SG, MY) · Traditional (TW, HK, MO) |
 | Arabic | Egypt, Saudi Arabia, UAE, Lebanon, Syria, Jordan, Palestine, Iraq, Morocco, Algeria, Tunisia | Egypt and Sudan · Gulf · Levant · Iraq · Maghreb |
+| Catalan | Catalonia (`ca-ES`), Valencia (`ca-ES-valencia`), Andorra | one group. `ca-ES` is labelled Catalonia because Valencian has its own tag |
+| Persian | Iran, Afghanistan (Dari) | each its own group |
 
-Neighbours, closest first: Puerto Rico → Dominican Republic, Cuba, Venezuela, US. Mexico ↔ US. Argentina → Uruguay, Paraguay. Australia → New Zealand, UK. Hong Kong → Macau, Traditional. And a few more.
+Neighbours, closest first: Puerto Rico → Dominican Republic, Cuba, Venezuela, US. Mexico ↔ US. Valencia → Catalonia. Argentina → Uruguay, Paraguay. Australia → New Zealand, UK. Hong Kong → Macau, Traditional. And a few more.
 
 ## Matching
 `DC.langFit(have, want)` scores how well a track, voice or translation in `have` suits someone who wants `want`:
@@ -69,5 +71,7 @@ Regions that aren't offered still match by group, so an `es-GT` track suits a Me
 
 ## Not covered
 - Script variants other than Chinese (for example Serbian in Cyrillic or Latin)
+- Balearic Catalan (Mallorca's *al·lot* for "boy"): there's no standard tag for it
+- Dialects within one country: Irish (Munster, Connacht, Ulster), north and south Welsh, Galician and Basque dialects. These languages are in the list without regions
 - Regional slang in meanings: the meaning comes from the translation engine, so the dictionaries are the better reference
 - The region is remembered per video, not per YouTube channel (see [[Known issues and next steps]])
