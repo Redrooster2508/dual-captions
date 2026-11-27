@@ -16,6 +16,7 @@ Why: a big interest in learning languages, and existing services' paywalls felt 
 - [[Netflix]]: manifest hooks, downloads, seeking
 - [[Other sites and subtitle files]]
 - [[Machine translation]]
+- [[Regional varieties]]: Spain vs Mexico vs Puerto Rico Spanish, and other languages
 - [[Library]]: saved words, statuses, review, export
 - [[Testing]]
 - [[Decisions]]: choices made and why

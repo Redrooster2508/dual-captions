@@ -16,13 +16,13 @@ A Manifest V3 Chrome extension with no build step: plain JavaScript files, loade
 ## Messages
 - **hook ⇄ content:** `window.postMessage({ dualcap: 'page' | 'content', type, payload })`. Types: `yt:getTracks`, `yt:tracks`, `yt:loadTrack`, `yt:timedtext`, `nf:getTracks`, `nf:tracks`, `nf:seek`, `nf:pause`, `nf:play`
 - **content → background:** `dc:fetchText` (Netflix CDN only), `dc:deepl`
-- **popup → content:** `dc:getState` (every second while the popup is open), `dc:select`
-- **Storage:** `chrome.storage.local` keys `settings`, `deeplKey`, `library`. Every page listens for changes, so an edit anywhere shows up everywhere straight away
+- **popup → content:** `dc:getState` (every second while the popup is open), `dc:select`, `dc:setVariety` (where this video's language is from)
+- **Storage:** `chrome.storage.local` keys `settings`, `deeplKey`, `library`, `varieties` (each video's region, see [[Regional varieties]]). Every page listens for changes, so an edit anywhere shows up everywhere straight away
 
 ## Content script files
 | File | Role |
 |---|---|
-| `shared/settings.js` | Defaults and the language list (shared with the popup) |
+| `shared/settings.js` | Defaults, the language list, and the regional varieties: tags, matching, names, DeepL variants, voices. Shared with the popup, the Library page and the background worker (`importScripts`). See [[Regional varieties]] |
 | `shared/library.js` | Library storage (shared with the popup and Library page). See [[Library]] |
 | `content/parsers.js` | Subtitle parsers, cue lookup, file decoding. See [[Other sites and subtitle files]] |
 | `content/translate.js` | Chrome's Translator API and DeepL. See [[Machine translation]] |
@@ -33,8 +33,8 @@ A Manifest V3 Chrome extension with no build step: plain JavaScript files, loade
 
 ## The controller (`main.js`)
 - **Every 500 ms:** has the title changed (the adapter's `mediaKey`), has the video element changed
-- **Subtitle line default:** a track in the language being learnt (manual before auto-generated), else the best-ranked track
-- **Translation line, "Auto":** a human track in your language → YouTube auto-translate → machine translation. If the subtitles are already in your language, it translates into the language you're learning instead
+- **Subtitle line default:** a track in the language being learnt: human before auto-generated, then the closest regional variety, then the site's order. Else the best-ranked track
+- **Translation line, "Auto":** a human track in your language (closest variety) → YouTube auto-translate (closest variety) → machine translation. If the subtitles are already in your language, it translates into the language you're learning instead
 - **Loading:** both tracks load in parallel; a load token drops results from a selection that has since been replaced
 - **Drawing:** a `requestAnimationFrame` loop while there's a video and a track. The overlay is `position: fixed`, lined up with the video's rectangle each frame, and moved into the fullscreen element when there is one. Text is 4.3% of the video height × the size setting, 14–72 px
 - **Pausing:** hovering the captions and the open word popup each hold a pause; playback resumes when the last hold is released, unless you pressed play yourself

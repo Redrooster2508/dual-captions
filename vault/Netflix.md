@@ -6,7 +6,7 @@ tags: [site]
 ## Subtitle list from the manifest
 Netflix fetches a "manifest" for each title. The request body is built with `JSON.stringify` before it's encrypted, and the response is read with `JSON.parse`, so `hook.js` wraps both (from document start, in the page's own JavaScript):
 - **Request:** objects whose `url` matches `/manifest/i` get `webvtt-lssdh-ios8` and `dfxp-ls-sdh` added to `profiles` (text subtitle formats) and `showAllSubDubTracks = true` (every language, not just the few shown for your region)
-- **Response:** `result.timedtexttracks` (with `result.movieId`). Each track gives a language, a label (`[CC]` for closed captions) and a WebVTT or TTML URL from `ttDownloadables`. Newer manifests use `urls[0].url` and older ones `downloadUrls{}`; both are handled. The "off" track, forced narratives and image-only subtitles are skipped
+- **Response:** `result.timedtexttracks` (with `result.movieId`). Track languages are Netflix's own tags; regional ones are matched to your variety ([[Regional varieties]]). Which tags it uses for Spanish and Portuguese hasn't been seen on the real site yet. Each track gives a language, a label (`[CC]` for closed captions) and a WebVTT or TTML URL from `ttDownloadables`. Newer manifests use `urls[0].url` and older ones `downloadUrls{}`; both are handled. The "off" track, forced narratives and image-only subtitles are skipped
 
 Manifests are kept per `movieId`, so a preloaded next episode works; the content script matches it to `/watch/<id>`.
 

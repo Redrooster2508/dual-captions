@@ -26,7 +26,9 @@ Found in testing ([[Log/2026-11-27]]): with immediate retries, every attempt fin
 - Auto-generated tracks roll up: each line lingers while the next appears, and `aAppend` events add the line breaks. The parser drops `aAppend` events and ends each line where the next starts, so one line shows at a time
 
 ## Auto-translate
-`tlang=<code>` returns YouTube's machine translation of any translatable track, timed like the original. It's the translation line when there's no human track in your language.
+`tlang=<code>` returns YouTube's machine translation of any translatable track, timed like the original. It's the translation line when there's no human track in your language. The code is whichever of `translationLanguages` is closest to your variety (for example `pt-PT` for European Portuguese, if YouTube offers it). See [[Regional varieties]].
+
+Track tags vary: `es`, `es-419`, `es-ES`, `es-MX`, `zh-Hans`, and `iw` for Hebrew. Auto-generated tracks (`kind: 'asr'`) are always a plain language and come after human tracks.
 
 ## Other
 - YouTube's own captions (`.ytp-caption-window-container`) are hidden while the overlay is active. Because the extension switches them on to get the token, they show again if the extension is turned off

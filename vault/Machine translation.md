@@ -19,8 +19,15 @@ No unofficial translation endpoints are used. See [[Decisions]].
 - Results are cached by line text for the current track selection
 - Errors show on the translation line. Network errors retry after 15 s; a bad key or an unsupported language pair waits until settings change
 
-## Language codes
-Engines get the base language (`es-419` → `es`), except Chinese: `zh` (Simplified) or `zh-Hant`. DeepL targets are `EN-US`, `PT-BR`, `ZH-HANS`, `ZH-HANT`, and otherwise the code in upper case.
+## Language codes and regions
+- **DeepL:**
+  - Sources are plain languages.
+  - Targets are the closest variant DeepL has to your variety: `EN-GB` (UK and the Commonwealth) or `EN-US`, `PT-PT` or `PT-BR`, `ES-419` (the Americas) or `ES`, `ZH-HANT` or `ZH-HANS`. Other languages use the plain code in upper case.
+  - With no region set, the defaults are `EN-US`, `PT-BR`, `ES` and `ZH-HANS`.
+  - DeepL's Latin American Spanish is neutral, not per country.
+- **Chrome on-device:** plain languages, except Chinese: `zh` (Simplified) or `zh-Hant`.
+- When "I speak" has a region that the engine can't produce, the popup says so: "On-device translation is general English; DeepL can do English (United Kingdom)." or "DeepL has no Spanish (Puerto Rico), so translations are in Spanish (Latin America)."
+- Both engines use `DC.deeplTarget` and `DC.translate.outputLang`, so the translation line's label names what you actually get. See [[Regional varieties]].
 
 ## Word lookups
 The clicked word is translated on its own. DeepL also gets the caption line as `context`, which helps it pick the right meaning without translating the line.
