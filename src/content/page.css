@@ -1,0 +1,5 @@
+/* Hide the site's own captions while Dual Captions is drawing its overlay. */
+html.dualcap-hide-yt .ytp-caption-window-container,
+html.dualcap-hide-nf .player-timedtext {
+  display: none !important;
+}

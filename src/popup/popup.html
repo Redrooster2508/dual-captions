@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Dual Captions</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <div class="brand"><img src="../../icons/icon48.png" alt=""><span>Dual Captions</span></div>
+    <label class="switch" title="Turn Dual Captions on or off">
+      <input type="checkbox" id="enabled"><span class="track"></span>
+    </label>
+  </header>
+
+  <section id="now">
+    <h2>This video</h2>
+    <p id="title" class="title"></p>
+    <div id="pickers" hidden>
+      <label class="field"><span>Subtitles</span><select id="primary"></select></label>
+      <label class="field"><span>Translation</span><select id="secondary"></select></label>
+      <p id="secondaryHint" class="hint"></p>
+    </div>
+    <p id="status" class="status" hidden></p>
+  </section>
+
+  <section>
+    <h2>Languages</h2>
+    <div class="row2">
+      <label class="field"><span>I'm learning</span><select id="learnLang"></select></label>
+      <label class="field"><span>I speak</span><select id="nativeLang"></select></label>
+    </div>
+  </section>
+
+  <section>
+    <h2>Display</h2>
+    <label class="field slider">
+      <span>Text size</span>
+      <input type="range" id="fontScale" min="0.6" max="1.8" step="0.1">
+      <output id="fontScaleOut"></output>
+    </label>
+    <label class="check"><input type="checkbox" id="pauseOnHover"><span>Pause while the mouse is over captions</span></label>
+    <label class="check"><input type="checkbox" id="autoPause"><span>Pause after each line</span><kbd>Q</kbd></label>
+    <label class="check"><input type="checkbox" id="blur"><span>Blur translation until hovered</span><kbd>W</kbd></label>
+  </section>
+
+  <section>
+    <h2>Machine translation</h2>
+    <label class="field">
+      <span>Used when there's no translation track</span>
+      <select id="engine">
+        <option value="builtin">Chrome on-device (free, private)</option>
+        <option value="deepl">DeepL (your API key)</option>
+        <option value="none">Off</option>
+      </select>
+    </label>
+    <label class="field" id="deeplRow" hidden>
+      <span>DeepL API key <a href="https://www.deepl.com/pro-api" target="_blank" rel="noopener">get a free one</a></span>
+      <input type="password" id="deeplKey" placeholder="xxxxxxxx-xxxx-…:fx" autocomplete="off" spellcheck="false">
+    </label>
+  </section>
+
+  <footer>
+    <button id="openLibrary" class="btn-primary">
+      <span>Open library</span><span id="libCount" class="count"></span>
+    </button>
+    <p class="keys"><kbd>A</kbd> previous line · <kbd>R</kbd> replay · <kbd>D</kbd> next · click a word to look it up</p>
+  </footer>
+
+  <script src="../shared/settings.js"></script>
+  <script src="../shared/library.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

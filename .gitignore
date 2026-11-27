@@ -1,0 +1,6 @@
+node_modules/
+.DS_Store
+*.zip
+# Obsidian's per-device state
+vault/.obsidian/workspace*.json
+vault/.obsidian/cache

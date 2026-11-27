@@ -1,0 +1,58 @@
+{
+  "manifest_version": 3,
+  "name": "Dual Captions",
+  "version": "0.1.0",
+  "description": "Two subtitle lines at once on YouTube, Netflix and any HTML5 video. Click words to look them up and keep them in your own library.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://*.nflxvideo.net/*",
+    "https://api-free.deepl.com/*",
+    "https://api.deepl.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "Dual Captions"
+  },
+  "options_page": "src/library/library.html",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://www.netflix.com/*"
+      ],
+      "js": [
+        "src/page/hook.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/shared/settings.js",
+        "src/shared/library.js",
+        "src/content/parsers.js",
+        "src/content/translate.js",
+        "src/content/overlay.js",
+        "src/content/sites.js",
+        "src/content/main.js"
+      ],
+      "css": [
+        "src/content/page.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

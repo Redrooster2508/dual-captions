@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Library · Dual Captions</title>
+  <link rel="stylesheet" href="library.css">
+</head>
+<body>
+  <div class="page">
+    <header class="top">
+      <div class="brand">
+        <img src="../../icons/icon128.png" alt="">
+        <div>
+          <h1>Library</h1>
+          <p id="summary" class="summary"></p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button id="reviewBtn" class="btn primary">Review</button>
+        <button id="addBtn" class="btn">+ Add word</button>
+        <details class="menu">
+          <summary class="btn">Export</summary>
+          <div class="menu-panel">
+            <button id="exportCsv">CSV for Anki or spreadsheets</button>
+            <button id="exportJson">Backup file (JSON)</button>
+            <label class="file">Restore from backup…<input type="file" id="importJson" accept=".json,application/json"></label>
+          </div>
+        </details>
+      </div>
+    </header>
+
+    <form id="addForm" class="add" hidden>
+      <input name="word" placeholder="Word or phrase" required autocomplete="off">
+      <input name="translation" placeholder="Meaning" autocomplete="off">
+      <select name="lang" aria-label="Language"></select>
+      <input name="note" placeholder="Note (optional)" autocomplete="off">
+      <label class="chk"><input type="checkbox" name="important"> ★ Important</label>
+      <button class="btn primary">Add</button>
+    </form>
+
+    <nav class="tabs" aria-label="Filter">
+      <button data-filter="all">All <span class="n"></span></button>
+      <button data-filter="learning">Learning <span class="n"></span></button>
+      <button data-filter="known">Learnt <span class="n"></span></button>
+      <button data-filter="important">★ Important <span class="n"></span></button>
+    </nav>
+
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Search words, meanings, notes…" aria-label="Search">
+      <select id="langFilter" aria-label="Language"></select>
+      <select id="sort" aria-label="Sort">
+        <option value="new">Newest first</option>
+        <option value="old">Oldest first</option>
+        <option value="az">A → Z</option>
+        <option value="review">Least recently reviewed</option>
+      </select>
+    </div>
+
+    <main id="list"></main>
+    <div id="empty" class="empty" hidden></div>
+  </div>
+
+  <div id="review" class="review" hidden>
+    <div class="review-card" role="dialog" aria-modal="true" aria-label="Review">
+      <div class="review-top">
+        <span id="reviewProgress"></span>
+        <button id="reviewClose" class="icon" title="Close (Esc)">✕</button>
+      </div>
+      <div id="reviewBody"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="../shared/settings.js"></script>
+  <script src="../shared/library.js"></script>
+  <script src="library.js"></script>
+</body>
+</html>
