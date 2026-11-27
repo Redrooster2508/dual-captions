@@ -5,16 +5,18 @@
 (() => {
   const DC = (globalThis.DC ??= {});
 
-  // Engines want a base language, except for Chinese where the script matters.
-  function baseLang(tag) {
-    if (!tag) return '';
-    const t = String(tag).toLowerCase();
-    if (t.startsWith('zh')) return /hant|tw|hk|mo/.test(t) ? 'zh-Hant' : 'zh';
-    return t.split(/[-_]/)[0];
-  }
+  const names = DC.namer(['en']);
+  const langName = (tag) => names.full(tag);
 
-  const names = new Intl.DisplayNames(['en'], { type: 'language' });
-  const langName = (tag) => { try { return names.of(tag) || tag; } catch { return tag; } };
+  // What each engine can produce for a target variety. Chrome's translator
+  // takes plain languages (plus Traditional Chinese); DeepL has a few
+  // regional variants (British English, European Portuguese, Latin American
+  // Spanish…), and background.js picks the closest one.
+  function outputLang(tag, engine) {
+    const base = DC.baseOf(tag);
+    if (engine === 'deepl') return DC.normTag(DC.deeplTarget(tag));
+    return base === 'zh' && DC.sameGroup(tag, 'zh-Hant') ? 'zh-Hant' : base;
+  }
 
   const fail = (code, message) => Object.assign(new Error(message), { code });
 
@@ -47,29 +49,27 @@
 
   // Translate several texts; resolves to an array in the same order.
   async function many(texts, from, to, engine, context) {
-    from = baseLang(from);
-    to = baseLang(to);
     if (!texts.length) return [];
-    if (from && from === to) return texts.slice();
+    if (DC.baseOf(from) && DC.baseOf(from) === DC.baseOf(to)) return texts.slice();
     if (engine === 'builtin') {
-      if (!from) throw fail('unsupported', 'Set "I\'m learning" in the popup so the subtitle language is known.');
-      const tr = await getBuiltin(from, to);
+      if (!DC.baseOf(from)) throw fail('unsupported', 'Set "I\'m learning" in the popup so the subtitle language is known.');
+      const tr = await getBuiltin(outputLang(from, engine), outputLang(to, engine));
       const out = [];
       for (const t of texts) out.push(await tr.translate(t));
       return out;
     }
     if (engine === 'deepl') {
-      const res = await chrome.runtime.sendMessage({ type: 'dc:deepl', texts, from, to, context });
+      const res = await chrome.runtime.sendMessage({ type: 'dc:deepl', texts, from: DC.baseOf(from), to: DC.normTag(to), context });
       if (!res?.ok) throw fail(res?.code || 'network', res?.error || 'DeepL request failed');
       return res.texts;
     }
     throw fail('off', 'Machine translation is off');
   }
 
-  DC.baseLang = baseLang;
   DC.langName = langName;
   DC.translate = {
     many,
+    outputLang,
     downloadProgress: () => progress,
     reset() { builtin = null; progress = null; },
   };

@@ -10,7 +10,7 @@ I've always had a big interest in learning new languages. I've used the existing
 
 1. Open `chrome://extensions` and turn on **Developer mode** (top right).
 2. Click **Load unpacked** and pick this folder (`dual-captions`).
-3. Pin the extension, click its icon, and set **I'm learning** / **I speak**.
+3. Pin the extension, click its icon, and set **I'm learning** / **I speak**, with a region if it matters to you (Spanish from Spain, Mexico or Puerto Rico, Brazilian or European Portuguese…).
 
 This works in Chrome, Edge, Brave and other Chromium browsers. After editing the code, click the reload icon on the extension's card and refresh any open video tabs.
 
@@ -39,6 +39,20 @@ This works in Chrome, Edge, Brave and other Chromium browsers. After editing the
 - **Export** as CSV (importable into Anki or a spreadsheet), or back up to and restore from a JSON file.
 - Add words by hand with **+ Add word**.
 
+## Regional varieties
+
+Languages differ from place to place: a *guagua* is a bus in Puerto Rico and a baby in Chile. Under each language in the popup you can pick a region. Spanish has Spain, Mexico, the US, Puerto Rico, Cuba, the Dominican Republic, Colombia, Venezuela, Peru, Chile, Argentina, or Latin America in general. Portuguese, English, French, German, Dutch, Chinese and Arabic have regions too.
+
+- **Subtitles:** the closest track is chosen. If you're learning Puerto Rican Spanish and a video has Spain and Latin American subtitles, you get the Latin American ones. Human subtitles still come before auto-generated ones.
+- **Translations:** YouTube auto-translate and DeepL use your region where they have it. DeepL has British and American English, European and Brazilian Portuguese, Latin American Spanish, and Simplified and Traditional Chinese. Chrome's on-device translator has no regions; the popup tells you when that applies.
+- **Each video's region** comes from its subtitles when they say. Otherwise, set it in the word popup or the toolbar popup ("Where this Spanish is from"). It's remembered for that video.
+- **Library:**
+  - Words are saved per region, so *guagua* for Puerto Rico and *guagua* for Chile are separate entries.
+  - A word saved only for another region gets a dotted underline in the captions, and its popup shows that meaning.
+  - You can change a word's region on its card, filter and search by region, and the CSV export has a `variety` column.
+- **Pronunciation** uses the closest accent your system has.
+- **Dictionaries:** every word links to Wiktionary, which labels regional meanings. Spanish words also link to the RAE dictionary, or for Latin American Spanish to the *Diccionario de americanismos*, which lists meanings country by country. Portuguese words also link to Priberam.
+
 ## Machine translation
 
 Machine translation is only used for lines that have no human or YouTube translation, and for word lookups.
@@ -57,6 +71,7 @@ Machine translation is only used for lines that have no human or YouTube transla
 | `src/content/overlay.js` | The caption overlay (in a shadow root, so site CSS can't touch it). |
 | `src/content/parsers.js` | WebVTT, SRT, ASS/SSA, TTML/DFXP and YouTube json3 parsers. |
 | `src/content/translate.js` | Chrome Translator API and DeepL (via `src/background.js`). |
+| `src/shared/settings.js` | Default settings and regional varieties: which regions are close to each other, and how tracks, voices and translation targets are matched. |
 | `src/shared/library.js` | Library storage (`chrome.storage.local`), shared by all pages. |
 | `src/popup/`, `src/library/` | The toolbar popup and the Library page. |
 

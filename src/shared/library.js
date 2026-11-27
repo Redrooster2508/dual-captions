@@ -2,7 +2,9 @@
 // { [key]: entry }. Shared by the content script, popup and library page.
 //
 // entry = {
-//   key, word, lang,                 key is `${lang}|${word lowercased}`
+//   key, word, lang,                 key is `${lang}|${word lowercased}`; lang
+//                                    includes the variety when known ('es-PR'),
+//                                    so a word can be saved once per variety
 //   translation, note,
 //   status: 'learning' | 'known',
 //   important: boolean,
@@ -47,6 +49,20 @@
     await chrome.storage.local.set({ [STORE]: lib });
   }
 
+  // Give an entry another language tag (usually to set its variety). Fails
+  // with code 'exists' if the word is already saved under that tag.
+  async function move(key, lang) {
+    const lib = await all();
+    const entry = lib[key];
+    if (!entry) return null;
+    const to = keyOf(entry.word, lang);
+    if (to !== key && lib[to]) throw Object.assign(new Error(`“${entry.word}” is already saved for that variety`), { code: 'exists' });
+    delete lib[key];
+    lib[to] = { ...entry, lang, key: to, updatedAt: Date.now() };
+    await chrome.storage.local.set({ [STORE]: lib });
+    return lib[to];
+  }
+
   async function replaceAll(lib) {
     await chrome.storage.local.set({ [STORE]: lib });
   }
@@ -57,5 +73,5 @@
     });
   }
 
-  DC.library = { keyOf, all, put, remove, replaceAll, onChange };
+  DC.library = { keyOf, all, put, remove, move, replaceAll, onChange };
 })();

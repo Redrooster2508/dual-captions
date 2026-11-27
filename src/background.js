@@ -1,6 +1,8 @@
 // Background service worker: makes the cross-origin requests content scripts
 // can't (Netflix subtitle files, DeepL), keeping the DeepL key out of pages.
 
+importScripts('shared/settings.js'); // DC.deeplTarget
+
 const FETCH_ALLOWED = /^https:\/\/([a-z0-9-]+\.)*nflxvideo\.net\//i;
 
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
@@ -21,17 +23,16 @@ async function fetchText(url) {
   return { ok: true, text: await res.text() };
 }
 
-// DeepL wants upper-case codes and a regional variant for some targets.
-const deeplSource = (l) => (l.startsWith('zh') ? 'ZH' : l.toUpperCase());
-const deeplTarget = (l) =>
-  ({ en: 'EN-US', pt: 'PT-BR', zh: 'ZH-HANS', 'zh-Hant': 'ZH-HANT' })[l] || l.toUpperCase();
+// DeepL wants upper-case codes. Sources are plain languages; some targets
+// have regional variants (see DC.deeplTarget).
+const deeplSource = (l) => DC.baseOf(l).toUpperCase();
 
 async function deepl({ texts, from, to, context }) {
   const { deeplKey = '' } = await chrome.storage.local.get('deeplKey');
   const key = deeplKey.trim();
   if (!key) return { ok: false, code: 'unsupported', error: 'Add your DeepL API key in the popup.' };
   const host = key.endsWith(':fx') ? 'api-free.deepl.com' : 'api.deepl.com';
-  const body = { text: texts, target_lang: deeplTarget(to) };
+  const body = { text: texts, target_lang: DC.deeplTarget(to) };
   if (from) body.source_lang = deeplSource(from);
   if (context) body.context = context;
   const res = await fetch(`https://${host}/v2/translate`, {

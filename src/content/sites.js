@@ -1,8 +1,9 @@
 // Site adapters. Each one finds the video, works out which title is playing,
 // discovers its subtitle tracks and knows how to seek/pause on that site.
 //
-// A track is { id, label, lang, rank, load(): Promise<cues> } (lower rank is
-// preferred when picking a default).
+// A track is { id, label, lang, rank, auto, load(): Promise<cues> }. When
+// picking a default, human tracks come before auto-generated ones (auto),
+// then the closest language variety, then lower rank.
 (() => {
   const DC = (globalThis.DC ??= {});
 
@@ -118,6 +119,7 @@
           label: t.name,
           lang: t.languageCode,
           rank: t.kind === 'asr' ? 1 : 0,
+          auto: t.kind === 'asr',
           raw,
           load: () => fetchCues(raw),
         };
@@ -125,15 +127,17 @@
       // YouTube can machine-translate any translatable track into many languages.
       const translationFor = (track, target) => {
         if (!track.raw?.isTranslatable) return null;
-        const want = DC.baseLang(target);
-        const tl = translations.find((l) => l.languageCode === target) ||
-          translations.find((l) => DC.baseLang(l.languageCode) === want);
+        const tl = translations
+          .map((l) => ({ l, fit: DC.langFit(l.languageCode, target) }))
+          .filter((x) => x.fit > 0)
+          .sort((a, b) => b.fit - a.fit)[0]?.l;
         if (!tl) return null;
         return {
           id: `yt-tl:${track.id}:${tl.languageCode}`,
           label: `${tl.name || tl.languageCode} (YouTube auto-translate)`,
           lang: tl.languageCode,
           rank: 2,
+          auto: true,
           load: () => fetchCues(track.raw, tl.languageCode),
         };
       };

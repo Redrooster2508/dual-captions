@@ -33,10 +33,15 @@
     <form id="addForm" class="add" hidden>
       <input name="word" placeholder="Word or phrase" required autocomplete="off">
       <input name="translation" placeholder="Meaning" autocomplete="off">
-      <select name="lang" aria-label="Language"></select>
       <input name="note" placeholder="Note (optional)" autocomplete="off">
-      <label class="chk"><input type="checkbox" name="important"> ★ Important</label>
-      <button class="btn primary">Add</button>
+      <span class="lang-pick">
+        <select name="lang" aria-label="Language"></select>
+        <select name="variety" aria-label="Region"></select>
+      </span>
+      <span class="add-end">
+        <label class="chk"><input type="checkbox" name="important"> ★ Important</label>
+        <button class="btn primary">Add</button>
+      </span>
     </form>
 
     <nav class="tabs" aria-label="Filter">

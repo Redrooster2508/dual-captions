@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Dual Captions",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Two subtitle lines at once on YouTube, Netflix and any HTML5 video. Click words to look them up and keep them in your own library.",
   "icons": {
     "16": "icons/icon16.png",

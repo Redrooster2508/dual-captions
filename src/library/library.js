@@ -1,7 +1,7 @@
 const DC = globalThis.DC;
 const $ = (id) => document.getElementById(id);
-const names = new Intl.DisplayNames([navigator.language, 'en'], { type: 'language' });
-const langName = (code) => { try { return code ? names.of(code) : 'Unknown'; } catch { return code; } };
+const names = DC.namer([navigator.language, 'en']);
+const langName = (code) => (code ? names.full(code) : 'Unknown');
 
 let lib = {};
 let settings = { ...DC.DEFAULTS };
@@ -46,12 +46,16 @@ function highlight(sentence, word) {
 const matchesFilter = (e, f) =>
   f === 'all' || (f === 'important' ? e.important : e.status === f);
 
+// view.lang is '' (all), 'base:es' (Spanish, any region) or 'tag:es-PR'.
+const matchesLang = (e, l) =>
+  !l || (l.startsWith('base:') ? DC.baseOf(e.lang) === l.slice(5) : DC.normTag(e.lang) === l.slice(4));
+
 function visibleEntries() {
   const q = view.search.trim().toLocaleLowerCase();
   const list = Object.values(lib).filter((e) =>
     matchesFilter(e, view.filter) &&
-    (!view.lang || e.lang === view.lang) &&
-    (!q || [e.word, e.translation, e.note, e.sentence, e.sentenceTranslation, e.source?.title]
+    matchesLang(e, view.lang) &&
+    (!q || [e.word, e.translation, e.note, e.sentence, e.sentenceTranslation, e.source?.title, langName(e.lang)]
       .some((s) => s && s.toLocaleLowerCase().includes(q))));
   const sorters = {
     new: (a, b) => b.addedAt - a.addedAt,
@@ -78,16 +82,26 @@ function render() {
     b.querySelector('.n').textContent = counts[b.dataset.filter];
   }
 
-  const langs = [...new Set(all.map((e) => e.lang))].sort();
+  // One option per language, plus its regions when words come from several.
+  const tags = [...new Set(all.map((e) => DC.normTag(e.lang)))].sort();
   const lf = $('langFilter');
-  const want = ['', ...langs].join(',');
+  const want = tags.join(',');
   if (lf.dataset.sig !== want) {
     lf.dataset.sig = want;
-    lf.replaceChildren(new Option('All languages', ''), ...langs.map((l) => new Option(langName(l), l)));
-    if (!langs.includes(view.lang)) view.lang = '';
+    const byBase = new Map();
+    for (const t of tags) byBase.set(DC.baseOf(t), [...(byBase.get(DC.baseOf(t)) || []), t]);
+    const opts = [...byBase].sort((a, b) => names.base(a[0]).localeCompare(names.base(b[0]))).map(([b, ts]) =>
+      ts.length === 1
+        ? new Option(langName(ts[0]), `base:${b}`)
+        : h('optgroup', { label: names.base(b) },
+            new Option(`All ${names.base(b)}`, `base:${b}`),
+            ...ts.map((t) => [t, names.variety(t) || 'No region']).sort((x, y) => x[1].localeCompare(y[1]))
+              .map(([t, n]) => new Option(n, `tag:${t}`))));
+    lf.replaceChildren(new Option('All languages', ''), ...opts);
+    if (![...lf.options].some((o) => o.value === view.lang)) view.lang = '';
     lf.value = view.lang;
   }
-  lf.hidden = langs.length < 2;
+  lf.hidden = tags.length < 2;
 
   const entries = visibleEntries();
   $('list').replaceChildren(...entries.map(card));
@@ -123,7 +137,7 @@ function card(e) {
     h('div', { class: 'main' },
       h('div', { class: 'word-row' },
         h('h3', { class: 'word', lang: e.lang }, e.word),
-        h('span', { class: 'lang' }, langName(e.lang)),
+        langChip(e),
         e.status === 'known' && h('span', { class: 'badge-known' }, '✓ Learnt'),
         h('button', { class: 'speak', title: 'Pronounce', 'aria-label': 'Pronounce', onclick: () => speak(e.word, e.lang) }, '🔊')),
       editable('tr', e.translation, 'Add a meaning…', 'translation'),
@@ -150,9 +164,36 @@ function card(e) {
       }, 'Delete')));
 }
 
+// "Spanish · Puerto Rico ▾": the region a word is from, changeable.
+function langChip(e) {
+  const base = DC.baseOf(e.lang);
+  const tag = DC.normTag(e.lang);
+  const opts = names.varieties(base);
+  if (!opts.length) return h('span', { class: 'lang' }, langName(e.lang));
+  if (DC.parseTag(tag).sub && !opts.some(([t]) => t === tag)) opts.push([tag, names.variety(tag)]);
+  const sel = h('select', { class: 'lang', 'aria-label': 'Region', title: 'Which region this word is from' },
+    new Option(`${names.base(base)} · no region`, base),
+    ...opts.map(([t, n]) => new Option(`${names.base(base)} · ${n}`, t)));
+  sel.value = DC.parseTag(tag).sub ? tag : base;
+  sel.addEventListener('change', async () => {
+    try {
+      await DC.library.move(e.key, sel.value);
+      sel.blur();
+    } catch (err) {
+      toast(err.message);
+      sel.value = DC.parseTag(tag).sub ? tag : base;
+    }
+  });
+  return sel;
+}
+
+// Words without a region are spoken in the variety you're learning.
 function speak(text, lang) {
+  const tag = DC.parseTag(lang).sub || DC.baseOf(lang) !== DC.baseOf(settings.learnLang) ? lang : settings.learnLang;
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = lang;
+  const voice = DC.pickVoice(tag);
+  u.lang = voice?.lang || tag;
+  if (voice) u.voice = voice;
   speechSynthesis.cancel();
   speechSynthesis.speak(u);
 }
@@ -176,16 +217,27 @@ $('search').addEventListener('input', (e) => { view.search = e.target.value; ren
 $('langFilter').addEventListener('change', (e) => { view.lang = e.target.value; render(); });
 $('sort').addEventListener('change', (e) => { view.sort = e.target.value; render(); });
 
+// The add form's language and region selects, set to `tag`.
+function setAddLang(tag) {
+  const f = $('addForm').elements;
+  if (!f.lang.options.length) {
+    const opts = DC.LANGS.map((c) => [c, names.base(c)]).sort((a, b) => a[1].localeCompare(b[1]));
+    f.lang.replaceChildren(...opts.map(([c, n]) => new Option(n, c)));
+  }
+  const base = DC.LANGS.includes(DC.baseOf(tag)) ? DC.baseOf(tag) : 'es';
+  f.lang.value = base;
+  const opts = names.varieties(base);
+  f.variety.hidden = !opts.length;
+  f.variety.replaceChildren(new Option('Any region', base), ...opts.map(([t, n]) => new Option(n, t)));
+  f.variety.value = opts.some(([t]) => t === DC.normTag(tag)) ? DC.normTag(tag) : base;
+}
+$('addForm').elements.lang.addEventListener('change', (ev) => setAddLang(ev.target.value));
+
 $('addBtn').addEventListener('click', () => {
   const f = $('addForm');
   f.hidden = !f.hidden;
   if (!f.hidden) {
-    const sel = f.elements.lang;
-    if (!sel.options.length) {
-      const opts = DC.LANGS.map((c) => [c, langName(c)]).sort((a, b) => a[1].localeCompare(b[1]));
-      sel.replaceChildren(...opts.map(([c, n]) => new Option(n, c)));
-    }
-    sel.value = DC.LANGS.includes(settings.learnLang) ? settings.learnLang : 'es';
+    setAddLang(settings.learnLang);
     f.elements.word.focus();
   }
 });
@@ -194,7 +246,7 @@ $('addForm').addEventListener('submit', async (ev) => {
   const f = ev.target.elements;
   const word = f.word.value.trim();
   if (!word) return;
-  const lang = f.lang.value;
+  const lang = f.variety.hidden ? f.lang.value : f.variety.value;
   const existing = lib[DC.library.keyOf(word, lang)];
   await DC.library.put({
     word, lang, translation: f.translation.value.trim(), note: f.note.value.trim(), important: f.important.checked,
@@ -202,7 +254,7 @@ $('addForm').addEventListener('submit', async (ev) => {
   });
   toast(existing ? `Updated “${word}”` : `Added “${word}”`);
   ev.target.reset();
-  f.lang.value = lang;
+  setAddLang(lang);
   f.word.focus();
 });
 
@@ -218,10 +270,10 @@ function download(name, type, text) {
 const stamp = () => new Date().toISOString().slice(0, 10);
 
 $('exportCsv').addEventListener('click', () => {
-  const cols = ['word', 'translation', 'language', 'status', 'important', 'note', 'sentence', 'sentence_translation', 'source', 'link', 'added'];
+  const cols = ['word', 'translation', 'language', 'variety', 'status', 'important', 'note', 'sentence', 'sentence_translation', 'source', 'link', 'added'];
   const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const rows = visibleEntries().map((e) => [
-    e.word, e.translation, e.lang, e.status === 'known' ? 'learnt' : 'learning', e.important ? 'yes' : '', e.note,
+    e.word, e.translation, e.lang, names.variety(e.lang), e.status === 'known' ? 'learnt' : 'learning', e.important ? 'yes' : '', e.note,
     e.sentence, e.sentenceTranslation, e.source?.title || e.source?.site || '', e.source?.url || '', new Date(e.addedAt).toISOString(),
   ].map(q).join(','));
   download(`dual-captions-library-${stamp()}.csv`, 'text/csv;charset=utf-8', '﻿' + [cols.join(','), ...rows].join('\r\n'));

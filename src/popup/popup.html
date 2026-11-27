@@ -20,6 +20,10 @@
       <label class="field"><span>Subtitles</span><select id="primary"></select></label>
       <label class="field"><span>Translation</span><select id="secondary"></select></label>
       <p id="secondaryHint" class="hint"></p>
+      <label class="field" id="varietyRow" hidden>
+        <span id="varietyLabel"></span>
+        <select id="variety" title="Used for words you save, pronunciation and dictionary links"></select>
+      </label>
     </div>
     <p id="status" class="status" hidden></p>
   </section>
@@ -27,8 +31,16 @@
   <section>
     <h2>Languages</h2>
     <div class="row2">
-      <label class="field"><span>I'm learning</span><select id="learnLang"></select></label>
-      <label class="field"><span>I speak</span><select id="nativeLang"></select></label>
+      <div class="field">
+        <span>I'm learning</span>
+        <select id="learnLang" aria-label="Language you're learning"></select>
+        <select id="learnVariety" class="variety" aria-label="Region of the language you're learning"></select>
+      </div>
+      <div class="field">
+        <span>I speak</span>
+        <select id="nativeLang" aria-label="Your language"></select>
+        <select id="nativeVariety" class="variety" aria-label="Region of your language"></select>
+      </div>
     </div>
   </section>
 
@@ -58,6 +70,7 @@
       <span>DeepL API key <a href="https://www.deepl.com/pro-api" target="_blank" rel="noopener">get a free one</a></span>
       <input type="password" id="deeplKey" placeholder="xxxxxxxx-xxxx-…:fx" autocomplete="off" spellcheck="false">
     </label>
+    <p id="mtHint" class="hint" hidden></p>
   </section>
 
   <footer>

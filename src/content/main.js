@@ -22,13 +22,15 @@
     primary: null, // { track, cues }
     secondary: null, // { track, cues }
     mt: null, // machine translation of the primary line
+    variety: '', // where this video's language is from, if you said ('es-PR')
     secLabel: '',
     status: '',
     failed: false,
     token: 0,
   };
   const cueCache = new Map(); // track id -> Promise<cues>
-  let libIndex = new Map();
+  let libIndex = new Map(); // key -> entry
+  let libByWord = new Map(); // `${base language}|${word}` -> entries in every variety
   let video = null;
   let fileSeq = 0;
 
@@ -66,17 +68,40 @@
   const allTracks = () => [...state.platformTracks, ...state.fileTracks];
   const findTrack = (id) => (id ? allTracks().find((t) => t.id === id) : null);
   const byRank = (a, b) => (a.rank || 0) - (b.rank || 0);
-  const same = (a, b) => DC.baseLang(a) === DC.baseLang(b);
+  const same = (a, b) => DC.baseOf(a) === DC.baseOf(b);
+
+  // The best track for a language variety: human subtitles before
+  // auto-generated ones, then the closest variety (Puerto Rican Spanish
+  // prefers es-PR, then Caribbean, then Latin American, then plain es), then
+  // the site's own order.
+  function bestFor(tracks, want) {
+    return tracks
+      .map((t) => ({ t, fit: DC.langFit(t.lang, want) }))
+      .filter((x) => x.fit > 0)
+      .sort((a, b) => (!!a.t.auto - !!b.t.auto) || (b.fit - a.fit) || byRank(a.t, b.t))[0]?.t || null;
+  }
 
   function pickPrimary() {
     const tracks = allTracks();
-    return tracks.filter((t) => same(t.lang, settings.learnLang)).sort(byRank)[0] || tracks.slice().sort(byRank)[0] || null;
+    return bestFor(tracks, settings.learnLang) || tracks.slice().sort(byRank)[0] || null;
   }
 
   // Translate into your language, or into the one you're learning if the
   // subtitles are already in your language.
   const targetFor = (pt) => (pt && same(pt.lang, settings.nativeLang) ? settings.learnLang : settings.nativeLang);
-  const sourceLang = (pt) => pt?.lang || settings.learnLang;
+  const sourceLang = (pt) => pt?.lang || DC.baseOf(settings.learnLang);
+
+  // The subtitle line's language with its variety when known: what you set
+  // for this video, else the track's own tag ('es-419'), else just 'es'.
+  function lineLang() {
+    const lang = DC.normTag(sourceLang(state.primary?.track));
+    return state.variety && same(state.variety, lang) ? state.variety : lang;
+  }
+
+  // For pronunciation and dictionaries: the line's variety, or the one
+  // you're learning when the video doesn't say.
+  const assumedLang = (lang) =>
+    (DC.parseTag(lang).sub || !same(lang, settings.learnLang) ? lang : settings.learnLang);
 
   function resolveSecondary(pt) {
     const mode = state.secondaryMode;
@@ -87,14 +112,14 @@
     }
     const target = targetFor(pt);
     const mt = pt && settings.engine !== 'none' ? { from: sourceLang(pt), to: target } : null;
-    const mtLabel = `Machine translation → ${DC.langName(DC.baseLang(target))}`;
+    const mtLabel = `Machine translation → ${DC.langName(DC.translate.outputLang(target, settings.engine))}`;
     if (mode === 'mt') return mt ? { mt, label: mtLabel } : { label: 'Machine translation is off (see Translation engine below)' };
-    const human = allTracks().filter((t) => t !== pt && same(t.lang, target)).sort(byRank)[0];
+    const human = bestFor(allTracks().filter((t) => t !== pt), target);
     if (human) return { track: human, label: human.label };
     const yt = pt && state.translationFor?.(pt, target);
     if (yt) return { track: yt, label: yt.label };
     if (mt) return { mt, label: mtLabel };
-    return { label: `No ${DC.langName(DC.baseLang(target))} subtitles, and machine translation is off` };
+    return { label: `No ${DC.langName(DC.baseOf(target))} subtitles, and machine translation is off` };
   }
 
   function newMT(from, to) {
@@ -165,6 +190,8 @@
     state.primaryId = state.fileTracks[0]?.id ?? null;
     state.secondaryMode = 'auto';
     state.primary = state.secondary = state.mt = null;
+    state.variety = '';
+    if (key) loadVariety(key);
     for (const id of [...cueCache.keys()]) if (!id.startsWith('file:')) cueCache.delete(id);
     overlay.clear();
     updateNativeHidden();
@@ -202,7 +229,7 @@
       queueMT(DC.cues.lastStartedIndex(state.primary.cues, t));
       sec = mtLine(pCues);
     }
-    overlay.setLines({ text: pCues.map((c) => c.text).join('\n'), lang: sourceLang(state.primary?.track) }, sec, settings.blur);
+    overlay.setLines({ text: pCues.map((c) => c.text).join('\n'), lang: lineLang() }, sec, settings.blur);
 
     // Pause at the end of each line so you can read it.
     const last = pCues[pCues.length - 1];
@@ -330,35 +357,80 @@
   // ------------------------------------------------------------ words & library
 
   let popupCtx = null;
-  const normWord = (word, lang) => (DC.baseLang(lang) === 'de' ? word : word.toLocaleLowerCase(lang || undefined));
-  const lookup = (word, lang) => libIndex.get(DC.library.keyOf(word, DC.baseLang(lang)));
+  const names = DC.namer(['en']);
+  const normWord = (word, lang) => (DC.baseOf(lang) === 'de' ? word : word.toLocaleLowerCase(lang || undefined));
 
-  function dictUrl(word, lang) {
-    const base = DC.baseLang(lang);
-    const anchor = DC.langName(base).replace(/ /g, '_');
-    return `https://en.wiktionary.org/wiki/${encodeURIComponent(normWord(word, lang))}#${encodeURIComponent(anchor)}`;
+  function indexLibrary(lib) {
+    libIndex = new Map(Object.entries(lib));
+    libByWord = new Map();
+    for (const e of libIndex.values()) {
+      const k = DC.library.keyOf(e.word, DC.baseOf(e.lang));
+      libByWord.set(k, [...(libByWord.get(k) || []), e]);
+    }
+  }
+
+  // The library entry for this word that fits the line's variety (the same
+  // variety, or either one unspecified), and entries for other varieties.
+  // "guagua" saved for Puerto Rico (bus) isn't the "guagua" of a Chilean film
+  // (baby), so those count as different words.
+  function saved(word, lang) {
+    const all = libByWord.get(DC.library.keyOf(word, DC.baseOf(lang))) || [];
+    const sub = DC.parseTag(lang).sub;
+    const fits = (e) => !sub || !DC.parseTag(e.lang).sub || DC.normTag(e.lang) === DC.normTag(lang);
+    const match = all.filter(fits).sort((a, b) => DC.langFit(b.lang, lang) - DC.langFit(a.lang, lang))[0] || null;
+    return { match, others: all.filter((e) => e !== match) };
+  }
+
+  // Wiktionary marks regional senses in every language; for Spanish and
+  // Portuguese, add a dictionary that lists usage by country.
+  function dictLinks(word, lang) {
+    const w = encodeURIComponent(normWord(word, lang));
+    const anchor = encodeURIComponent(names.base(lang).replace(/ /g, '_'));
+    const links = [['Wiktionary', `https://en.wiktionary.org/wiki/${w}#${anchor}`]];
+    const base = DC.baseOf(lang), assumed = assumedLang(lang);
+    if (base === 'es') {
+      links.push(DC.sameGroup(assumed, 'es-419')
+        ? ['Americanismos', `https://www.asale.org/damer/${w}`]
+        : ['RAE', `https://dle.rae.es/${w}`]);
+    }
+    if (base === 'pt') links.push(['Priberam', `https://dicionario.priberam.org/${w}`]);
+    return links;
+  }
+
+  function popupData(c) {
+    const { match, others } = saved(c.word, c.lang);
+    const base = DC.baseOf(c.lang);
+    const trackSub = DC.parseTag(sourceLang(state.primary?.track)).sub;
+    return {
+      word: c.word,
+      langLabel: names.base(c.lang),
+      // Where this video's language is from; you can change it here.
+      varieties: DC.VARIETIES[base] && {
+        value: state.variety && same(state.variety, c.lang) ? state.variety : '',
+        options: [
+          ['', trackSub ? `From the subtitles: ${names.variety(sourceLang(state.primary.track))}` : 'Region not set'],
+          ...names.varieties(base),
+        ],
+      },
+      translation: match?.translation || c.translation || (settings.engine !== 'none' ? 'Translating…' : 'Turn on a translation engine in the popup to see meanings here.'),
+      trState: match?.translation || c.translation ? 'done' : 'dim',
+      entry: match,
+      also: others.map((e) => ({ where: names.variety(e.lang) || 'no region', translation: e.translation })),
+      links: dictLinks(c.word, c.lang),
+    };
   }
 
   async function onWordClick(raw, span) {
     if (!video) return;
     holdPause('popup');
-    const lang = sourceLang(state.primary?.track);
+    const lang = lineLang();
     const word = normWord(raw, lang);
-    const entry = lookup(word, lang);
     const s = overlay.secondary;
     const sec = s.classList.contains('note') || s.classList.contains('action') ? '' : s.textContent;
-    popupCtx = { word, lang, sentence: overlay.lineText, sentenceTranslation: sec, time: video.currentTime, translation: entry?.translation || '' };
-    const canTranslate = settings.engine !== 'none';
-    overlay.showPopup(span, {
-      word,
-      langLabel: DC.langName(DC.baseLang(lang)),
-      translation: entry?.translation || (canTranslate ? 'Translating…' : 'Turn on a translation engine in the popup to see meanings here.'),
-      trState: entry?.translation ? 'done' : 'dim',
-      entry,
-      dictUrl: dictUrl(word, lang),
-    });
-    if (entry?.translation || !canTranslate) return;
-    const ctx = popupCtx;
+    const ctx = popupCtx = { word, lang, sentence: overlay.lineText, sentenceTranslation: sec, time: video.currentTime, translation: '' };
+    const data = popupData(ctx);
+    overlay.showPopup(span, data);
+    if (data.trState === 'done' || settings.engine === 'none') return;
     try {
       const [tr] = await DC.translate.many([word], lang, targetFor(state.primary?.track), settings.engine, ctx.sentence);
       ctx.translation = tr;
@@ -375,28 +447,33 @@
     releasePause('popup');
   }
 
-  async function onPopupAction(act) {
+  async function onPopupAction(act, value) {
     const c = popupCtx;
     if (!c) return;
     if (act === 'close') return closePopup();
-    if (act === 'speak') return speak(c.word, c.lang);
-    const lang = DC.baseLang(c.lang);
-    const key = DC.library.keyOf(c.word, lang);
-    let entry = libIndex.get(key) || null;
+    if (act === 'speak') return speak(c.word, assumedLang(c.lang));
+    if (act === 'variety') {
+      await setVariety(value);
+      c.lang = lineLang();
+      overlay.updatePopup(popupData(c));
+      return;
+    }
+    let entry = saved(c.word, c.lang).match;
     try {
       if (act === 'add' || act === 'add-important') {
         entry = await DC.library.put({
-          word: c.word, lang, translation: c.translation, status: 'learning', important: act === 'add-important',
+          word: c.word, lang: c.lang, translation: c.translation, status: 'learning', important: act === 'add-important',
           sentence: c.sentence, sentenceTranslation: c.sentenceTranslation,
           source: { site: site.name, title: site.title(), url: site.shareUrl(c.time), time: c.time },
         });
         overlay.toast(`Added “${c.word}” to your library`);
       } else if (act.startsWith('status:') && entry) {
-        entry = await DC.library.put({ key, status: act.slice(7) });
+        entry = await DC.library.put({ key: entry.key, status: act.slice(7) });
       } else if (act === 'important' && entry) {
-        entry = await DC.library.put({ key, important: !entry.important });
+        entry = await DC.library.put({ key: entry.key, important: !entry.important });
       } else if (act === 'remove' && entry) {
-        await DC.library.remove(key);
+        await DC.library.remove(entry.key);
+        libIndex.delete(entry.key);
         entry = null;
         overlay.toast(`Removed “${c.word}”`);
       }
@@ -404,19 +481,48 @@
       overlay.toast(e.message.includes('context invalidated') ? 'Extension was updated: reload this page' : e.message);
       return;
     }
-    libIndex.set(key, entry);
-    if (!entry) libIndex.delete(key);
+    if (entry) libIndex.set(entry.key, entry);
+    indexLibrary(Object.fromEntries(libIndex));
     overlay.markWords();
-    overlay.updatePopup({ entry });
+    overlay.updatePopup(popupData(c));
   }
 
   function speak(text, lang) {
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = lang;
-    const voice = speechSynthesis.getVoices().find((v) => same(v.lang, lang));
+    const voice = DC.pickVoice(lang);
+    u.lang = voice?.lang || lang;
     if (voice) u.voice = voice;
     speechSynthesis.cancel();
     speechSynthesis.speak(u);
+  }
+
+  // ------------------------------------------------------------ this video's variety
+
+  // Remembered per video, in chrome.storage.local "varieties":
+  // { [`${site}|${media key}`]: tag }, newest last.
+  const VARIETIES = 'varieties';
+  const varietyKey = (key) => `${site.name}|${key}`;
+
+  async function loadVariety(key) {
+    try {
+      const { [VARIETIES]: map = {} } = await chrome.storage.local.get(VARIETIES);
+      if (state.key === key) { state.variety = map[varietyKey(key)] || ''; kick(); }
+    } catch {}
+  }
+
+  async function setVariety(tag) {
+    state.variety = tag ? DC.normTag(tag) : '';
+    kick();
+    if (!state.key) return;
+    try {
+      const { [VARIETIES]: map = {} } = await chrome.storage.local.get(VARIETIES);
+      const k = varietyKey(state.key);
+      delete map[k];
+      if (state.variety) map[k] = state.variety;
+      const keys = Object.keys(map);
+      for (const old of keys.slice(0, Math.max(0, keys.length - 300))) delete map[old];
+      await chrome.storage.local.set({ [VARIETIES]: map });
+    } catch {}
   }
 
   window.addEventListener('pointerdown', (e) => { if (overlay.popupOpen && !overlay.contains(e)) closePopup(); }, true);
@@ -466,7 +572,12 @@
       if ('secondaryMode' in msg) state.secondaryMode = msg.secondaryMode;
       applySelection();
     }
-    if (msg.type === 'dc:getState' || msg.type === 'dc:select') {
+    if (msg.type === 'dc:setVariety') {
+      setVariety(msg.variety).then(() => {
+        if (popupCtx) { popupCtx.lang = lineLang(); overlay.updatePopup(popupData(popupCtx)); }
+      });
+    }
+    if (msg.type === 'dc:getState' || msg.type === 'dc:select' || msg.type === 'dc:setVariety') {
       reply({
         site: site.name,
         hasVideo: !!video,
@@ -477,6 +588,8 @@
         primaryId: state.primaryId,
         secondaryMode: state.secondaryMode,
         secondaryLabel: state.secLabel,
+        trackLang: state.primary ? DC.normTag(sourceLang(state.primary.track)) : '',
+        variety: state.variety,
         status: state.status || (state.tracksKnown && !allTracks().length ? NO_SUBS : ''),
       });
     }
@@ -499,8 +612,9 @@
   });
 
   DC.library.onChange((lib) => {
-    libIndex = new Map(Object.entries(lib));
+    indexLibrary(lib);
     overlay.markWords();
+    if (popupCtx) overlay.updatePopup(popupData(popupCtx));
   });
 
   // ------------------------------------------------------------ start
@@ -509,9 +623,9 @@
     try {
       const { settings: saved, library } = await chrome.storage.local.get(['settings', 'library']);
       settings = { ...DEFAULTS, ...saved };
-      libIndex = new Map(Object.entries(library || {}));
+      indexLibrary(library || {});
     } catch {}
-    overlay.setLookup(lookup);
+    overlay.setLookup(saved);
     const tick = () => {
       const key = site.mediaKey();
       if (key !== state.key) onMediaChange(key);

@@ -3,12 +3,14 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 
-const ctx = vm.createContext({ console, Intl, TextDecoder });
+const chrome = { i18n: { getUILanguage: () => 'en-GB' } };
+const ctx = vm.createContext({ console, Intl, TextDecoder, chrome });
 ctx.globalThis = ctx;
-for (const f of ['src/content/parsers.js', 'src/content/translate.js']) {
+for (const f of ['src/shared/settings.js', 'src/content/parsers.js', 'src/content/translate.js']) {
   vm.runInContext(readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'), ctx, { filename: f });
 }
-const { parse, cues, baseLang } = ctx.DC;
+const DC = ctx.DC;
+const { parse, cues } = DC;
 let n = 0;
 const test = (name, fn) => { fn(); n++; console.log('ok -', name); };
 
@@ -87,11 +89,67 @@ test('active cue lookup with overlaps and gaps', () => {
   assert.equal(cues.lastStartedIndex(list, -1), -1);
 });
 
-test('engine language codes', () => {
-  assert.equal(baseLang('es-419'), 'es');
-  assert.equal(baseLang('zh-Hans'), 'zh');
-  assert.equal(baseLang('zh-TW'), 'zh-Hant');
-  assert.equal(baseLang('pt_BR'), 'pt');
+// Pick the best of several language tags for `want`, as the extension does.
+const best = (tags, want) => tags.filter((t) => DC.langFit(t, want) > 0)
+  .sort((a, b) => DC.langFit(b, want) - DC.langFit(a, want))[0] ?? null;
+
+test('language tags: aliases, regions, scripts', () => {
+  assert.deepEqual({ ...DC.parseTag('pt_br') }, { base: 'pt', sub: 'BR' });
+  assert.equal(DC.normTag('es-419'), 'es-419');
+  assert.equal(DC.normTag('zh-hant-tw'), 'zh-TW');
+  assert.equal(DC.normTag('zh-HANS'), 'zh-Hans');
+  assert.equal(DC.normTag('iw'), 'he'); // YouTube still says iw for Hebrew
+  assert.equal(DC.normTag('fil'), 'tl');
+  assert.equal(DC.langFit('iw', 'he'), 100);
+  assert.equal(DC.langFit('fr', 'es'), 0);
+});
+
+test('Spanish: Spain, Mexico and Puerto Rico each get the closest subtitles', () => {
+  const tracks = ['es', 'es-ES', 'es-419', 'es-MX', 'es-DO'];
+  assert.equal(best(tracks, 'es-ES'), 'es-ES');
+  assert.equal(best(tracks, 'es-MX'), 'es-MX');
+  assert.equal(best(tracks, 'es-PR'), 'es-DO'); // Caribbean neighbour first
+  assert.equal(best(['es', 'es-ES', 'es-419'], 'es-PR'), 'es-419');
+  assert.equal(best(['es', 'es-ES'], 'es-PR'), 'es'); // plain beats another region
+  assert.equal(best(['es-ES', 'es-419'], 'es'), 'es-ES'); // no region wanted: any will do
+  assert.equal(best(['es-GT', 'es-ES'], 'es-MX'), 'es-GT'); // regions not offered still group
+});
+
+test('other languages with regional varieties', () => {
+  assert.equal(best(['pt-BR', 'pt-PT'], 'pt-AO'), 'pt-PT');
+  assert.equal(best(['en-US', 'en-GB'], 'en-AU'), 'en-GB');
+  assert.equal(best(['en-US', 'en-GB'], 'en-CA'), 'en-US');
+  assert.equal(best(['fr', 'fr-CA'], 'fr-BE'), 'fr');
+  assert.equal(best(['fr-FR', 'fr-CA'], 'fr-CA'), 'fr-CA');
+  assert.equal(best(['zh-Hans', 'zh-Hant'], 'zh-HK'), 'zh-Hant');
+  assert.equal(best(['zh-CN', 'zh-TW'], 'zh-Hant'), 'zh-TW');
+  assert.equal(best(['zh', 'zh-Hant'], 'zh-Hans'), 'zh');
+  assert.equal(best(['ar-SA', 'ar-LB'], 'ar-SY'), 'ar-LB');
+});
+
+test('defaults, popup options and names', () => {
+  assert.equal(DC.DEFAULTS.nativeLang, 'en-GB');
+  assert.equal(DC.offeredTag('zh-CN'), 'zh-Hans');
+  assert.equal(DC.offeredTag('es-GT'), 'es-419');
+  assert.equal(DC.offeredTag('en-SG'), 'en-GB');
+  assert.equal(DC.offeredTag('ja-JP'), 'ja');
+  const n = DC.namer(['en']);
+  assert.equal(n.full('es-PR'), 'Spanish (Puerto Rico)');
+  assert.equal(n.full('zh-Hant'), 'Chinese (Traditional)');
+  assert.equal(n.variety('es-419'), 'Latin America');
+  assert.ok(n.varieties('es').some(([t, name]) => t === 'es-PR' && name === 'Puerto Rico'));
+  assert.equal(n.varieties('ja').length, 0);
+});
+
+test('translation engines get the closest variety they have', () => {
+  const deepl = (t) => DC.deeplTarget(t);
+  assert.deepEqual(['en', 'en-US', 'en-CA', 'en-GB', 'en-AU', 'en-IE'].map(deepl), ['EN-US', 'EN-US', 'EN-US', 'EN-GB', 'EN-GB', 'EN-GB']);
+  assert.deepEqual(['pt', 'pt-BR', 'pt-PT', 'pt-MZ'].map(deepl), ['PT-BR', 'PT-BR', 'PT-PT', 'PT-PT']);
+  assert.deepEqual(['es', 'es-ES', 'es-MX', 'es-PR', 'es-419'].map(deepl), ['ES', 'ES', 'ES-419', 'ES-419', 'ES-419']);
+  assert.deepEqual(['zh', 'zh-Hans', 'zh-TW', 'zh-HK'].map(deepl), ['ZH-HANS', 'ZH-HANS', 'ZH-HANT', 'ZH-HANT']);
+  assert.deepEqual(['fr-CA', 'de-AT'].map(deepl), ['FR', 'DE']);
+  const builtin = (t) => DC.translate.outputLang(t, 'builtin');
+  assert.deepEqual(['es-PR', 'pt-PT', 'zh-TW', 'zh-CN'].map(builtin), ['es', 'pt', 'zh-Hant', 'zh']);
 });
 
 console.log(`\n${n} passed (TTML is tested in the browser, it needs DOMParser)`);

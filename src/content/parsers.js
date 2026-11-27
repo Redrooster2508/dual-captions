@@ -159,7 +159,9 @@
     if (b[0] === 0xff && b[1] === 0xfe) return new TextDecoder('utf-16le').decode(buf);
     if (b[0] === 0xfe && b[1] === 0xff) return new TextDecoder('utf-16be').decode(buf);
     try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch {}
-    return new TextDecoder(LEGACY[DC.baseLang?.(langHint)] || 'windows-1252').decode(buf);
+    const lang = DC.baseOf?.(langHint);
+    const legacy = lang === 'zh' && DC.sameGroup(langHint, 'zh-Hant') ? 'zh-Hant' : lang;
+    return new TextDecoder(LEGACY[legacy] || 'windows-1252').decode(buf);
   }
 
   // "Movie.2019.es.srt" -> "es", "show.pt-BR.vtt" -> "pt-BR"

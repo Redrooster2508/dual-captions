@@ -1,29 +1,57 @@
 const DC = globalThis.DC;
 const $ = (id) => document.getElementById(id);
-const names = new Intl.DisplayNames([navigator.language, 'en'], { type: 'language' });
-const langName = (code) => { try { return names.of(code); } catch { return code; } };
+const names = DC.namer([navigator.language, 'en']);
 
 let settings = { ...DC.DEFAULTS };
 let tabId = null;
 let lastTracksSig = '';
+let lastVarietySig = '';
 
 // ------------------------------------------------------------ settings
 
 function fillLangs(select, value) {
-  const codes = [...new Set([...DC.LANGS, value])].filter(Boolean);
-  const opts = codes.map((c) => [c, langName(c)]).sort((a, b) => a[1].localeCompare(b[1]));
-  select.replaceChildren(...opts.map(([c, n]) => new Option(n, c, false, c === value)));
+  const base = DC.baseOf(value);
+  const codes = [...new Set([...DC.LANGS, base])].filter(Boolean);
+  const opts = codes.map((c) => [c, names.base(c)]).sort((a, b) => a[1].localeCompare(b[1]));
+  select.replaceChildren(...opts.map(([c, n]) => new Option(n, c, false, c === base)));
+}
+
+// The region under each language: Spain, Mexico, Puerto Rico…
+function fillVariety(select, value) {
+  const { base, sub } = DC.parseTag(value);
+  const tag = DC.normTag(value);
+  const opts = names.varieties(base);
+  if (sub && !opts.some(([t]) => t === tag)) opts.push([tag, names.variety(tag)]);
+  select.hidden = !opts.length;
+  select.replaceChildren(new Option('Any region', base), ...opts.map(([t, n]) => new Option(n, t)));
+  select.value = sub ? tag : base;
+}
+
+// What the translation engine can actually give for your variety.
+function mtHint() {
+  const tag = DC.normTag(settings.nativeLang);
+  if (!DC.parseTag(tag).sub || settings.engine === 'none') return '';
+  const deepl = DC.normTag(DC.deeplTarget(tag));
+  if (settings.engine === 'builtin') {
+    return `On-device translation is general ${names.base(tag)}` +
+      (DC.parseTag(deepl).sub ? `; DeepL can do ${names.full(deepl)}.` : '.');
+  }
+  return deepl === tag ? '' : `DeepL has no ${names.full(tag)}, so translations are in ${names.full(deepl)}.`;
 }
 
 function showSettings() {
   $('enabled').checked = settings.enabled;
   fillLangs($('learnLang'), settings.learnLang);
   fillLangs($('nativeLang'), settings.nativeLang);
+  fillVariety($('learnVariety'), settings.learnLang);
+  fillVariety($('nativeVariety'), settings.nativeLang);
   $('fontScale').value = settings.fontScale;
   $('fontScaleOut').value = `${Math.round(settings.fontScale * 100)}%`;
   for (const id of ['pauseOnHover', 'autoPause', 'blur']) $(id).checked = settings[id];
   $('engine').value = settings.engine;
   $('deeplRow').hidden = settings.engine !== 'deepl';
+  $('mtHint').textContent = mtHint();
+  $('mtHint').hidden = !$('mtHint').textContent;
 }
 
 function save(patch) {
@@ -33,8 +61,8 @@ function save(patch) {
 }
 
 $('enabled').addEventListener('change', (e) => save({ enabled: e.target.checked }));
-$('learnLang').addEventListener('change', (e) => save({ learnLang: e.target.value }));
-$('nativeLang').addEventListener('change', (e) => save({ nativeLang: e.target.value }));
+for (const id of ['learnLang', 'learnVariety']) $(id).addEventListener('change', (e) => save({ learnLang: e.target.value }));
+for (const id of ['nativeLang', 'nativeVariety']) $(id).addEventListener('change', (e) => save({ nativeLang: e.target.value }));
 $('fontScale').addEventListener('input', (e) => save({ fontScale: +e.target.value }));
 for (const id of ['pauseOnHover', 'autoPause', 'blur']) {
   $(id).addEventListener('change', (e) => save({ [id]: e.target.checked }));
@@ -93,9 +121,30 @@ function showVideo(st) {
   }
   $('secondaryHint').textContent = st.secondaryLabel && st.secondaryMode === 'auto' ? `Using: ${st.secondaryLabel}` : '';
   $('secondaryHint').hidden = !$('secondaryHint').textContent;
+  showVariety(st);
   status.textContent = st.status || '';
   status.hidden = !st.status;
 }
+
+// Where this video's language is from, when the subtitles don't say (or say wrong).
+function showVariety(st) {
+  const base = DC.baseOf(st.trackLang);
+  const opts = names.varieties(base);
+  $('varietyRow').hidden = !opts.length;
+  const sig = JSON.stringify([st.trackLang, st.variety]);
+  if (!opts.length || sig === lastVarietySig || document.activeElement === $('variety')) return;
+  lastVarietySig = sig;
+  const trackSub = DC.parseTag(st.trackLang).sub;
+  $('varietyLabel').textContent = `Where this ${names.base(base)} is from`;
+  $('variety').replaceChildren(
+    new Option(trackSub ? `From the subtitles: ${names.variety(st.trackLang)}` : 'Not set', ''),
+    ...opts.map(([t, n]) => new Option(n, t)),
+  );
+  $('variety').value = st.variety && DC.baseOf(st.variety) === base ? st.variety : '';
+}
+$('variety').addEventListener('change', async (e) => {
+  try { showVideo(await chrome.tabs.sendMessage(tabId, { type: 'dc:setVariety', variety: e.target.value }, { frameId: 0 })); } catch {}
+});
 
 async function select(patch) {
   try { showVideo(await chrome.tabs.sendMessage(tabId, { type: 'dc:select', ...patch }, { frameId: 0 })); } catch {}

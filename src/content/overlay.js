@@ -35,6 +35,7 @@
     .w:hover, .w.picked { background: rgba(255, 255, 255, .22); }
     .w.learning { text-decoration: underline 0.08em #7cc4ff; text-underline-offset: .18em; }
     .w.important { text-decoration: underline 0.08em #ffc24b; text-underline-offset: .18em; color: #ffe3a3; }
+    .w.elsewhere { text-decoration: underline dotted 0.08em #9a9cab; text-underline-offset: .18em; }
 
     .pop {
       position: absolute; bottom: calc(100% + .5em); left: 0;
@@ -46,7 +47,13 @@
     .pop[hidden] { display: none; }
     .pop-head { display: flex; align-items: center; gap: .5em; }
     .pop-word { font-size: 1.45em; font-weight: 650; letter-spacing: -.01em; }
-    .pop-lang { color: #8d8f9a; font-size: .85em; }
+    .pop-lang { display: flex; align-items: center; gap: .4em; color: #8d8f9a; font-size: .85em; margin-top: .1em; }
+    .pop-lang select {
+      font: inherit; color: #c9cbd4; background: #2a2c33; border: 1px solid #3b3e47; border-radius: .4em;
+      padding: .15em .3em; min-width: 0; cursor: pointer;
+    }
+    .pop-also { color: #a9abb6; font-size: .88em; margin-top: .3em; }
+    .pop-also b { color: #d7d9e0; font-weight: 600; }
     .pop-close { margin-left: auto; }
     .pop-tr { margin: .25em 0 .1em; font-size: 1.08em; color: #f5d68a; }
     .pop-tr.dim { color: #8d8f9a; font-style: italic; font-size: .95em; }
@@ -115,7 +122,7 @@
       this.wrap.append(this.box, this.toastEl);
       root.append(style, this.wrap);
 
-      this.lookup = () => null;
+      this.lookup = () => ({});
       this.last = { p: null, s: null, sKind: null, lang: null };
       this.rect = '';
 
@@ -192,19 +199,23 @@
       this.markWords();
     }
 
-    // Highlight words that are in the library.
+    // Highlight words that are in the library. lookup(word, lang) returns
+    // { match, others }: the entry for this variety, and ones for other regions.
     setLookup(fn) { this.lookup = fn; this.markWords(); }
     markWords() {
       for (const w of this.primary.querySelectorAll('.w')) {
-        const entry = this.lookup(w.dataset.word, this.lang);
-        w.classList.toggle('important', !!entry?.important);
-        w.classList.toggle('learning', !!entry && !entry.important && entry.status === 'learning');
+        const { match, others = [] } = this.lookup(w.dataset.word, this.lang) || {};
+        w.classList.toggle('important', !!match?.important);
+        w.classList.toggle('learning', !!match && !match.important && match.status === 'learning');
+        w.classList.toggle('elsewhere', !match && others.length > 0);
       }
     }
 
     get lineText() { return this.primary.textContent; }
 
-    // data: { word, langLabel, translation, trState: 'loading'|'done'|'dim', entry, dictUrl }
+    // data: { word, langLabel, varieties: { value, options: [[tag, label]] } | null,
+    //         translation, trState: 'loading'|'done'|'dim', entry, also: [{ where, translation }],
+    //         links: [[label, url]] }
     showPopup(anchor, data) {
       this.primary.querySelectorAll('.picked').forEach((w) => w.classList.remove('picked'));
       anchor?.classList.add('picked');
@@ -223,9 +234,26 @@
       const close = el('button', 'icon pop-close', '✕');
       close.dataset.act = 'close';
       close.title = 'Close (Esc)';
-      head.append(el('span', 'pop-word', d.word), el('span', 'pop-lang', d.langLabel || ''), speak, close);
+      head.append(el('span', 'pop-word', d.word), speak, close);
+
+      // "Spanish · [Puerto Rico ▾]": where this video's language is from
+      const lang = el('div', 'pop-lang', d.langLabel || '');
+      if (d.varieties) {
+        const sel = el('select');
+        sel.title = "Where this video's language is from. Used for saving, pronunciation and dictionaries.";
+        sel.setAttribute('aria-label', 'Region');
+        for (const [value, label] of d.varieties.options) sel.append(new Option(label, value, false, value === d.varieties.value));
+        sel.addEventListener('change', () => this.h.onPopupAction?.('variety', sel.value));
+        lang.append(' · ', sel);
+      }
 
       const tr = el('div', 'pop-tr' + (d.trState === 'done' ? '' : ' dim'), d.translation || '');
+      // The same word saved for another region may mean something else.
+      const also = (d.also || []).slice(0, 2).map((a) => {
+        const line = el('div', 'pop-also', `Saved for ${a.where}`);
+        if (a.translation) line.append(': ', el('b', '', a.translation));
+        return line;
+      });
 
       const row = el('div', 'pop-row');
       if (!d.entry) {
@@ -252,16 +280,16 @@
         row.append(seg, star, del);
       }
       const links = el('div', 'pop-links');
-      if (d.dictUrl) {
-        const a = el('a', '', 'Dictionary ↗');
-        a.href = d.dictUrl;
+      for (const [label, url] of d.links || []) {
+        const a = el('a', '', `${label} ↗`);
+        a.href = url;
         a.target = '_blank';
         a.rel = 'noopener';
         links.append(a);
       }
       row.append(links);
 
-      const parts = [head, tr, row];
+      const parts = [head, lang, tr, ...also, row];
       if (d.entry) parts.push(el('div', 'pop-saved', d.entry.status === 'known' ? 'In your library · learnt' : 'In your library'));
       this.pop.replaceChildren(...parts);
     }
